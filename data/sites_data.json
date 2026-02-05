@@ -1,0 +1,20 @@
+[
+    {
+        "site_url": "https://satellite1.com",
+        "login": "admin_bot",
+        "app_password": "xxxx xxxx xxxx xxxx",
+        "target_url": "https://main-project.com/page1",
+        "anchor": "лучшие финансовые советы",
+        "topic": "Личные финансы и инвестиции",
+        "author_style": "expert"
+    },
+    {
+        "site_url": "https://finance-blog-test.com",
+        "login": "admin",
+        "app_password": "yyyy yyyy yyyy yyyy",
+        "target_url": "https://main-project.com/tips",
+        "anchor": "как экономить деньги",
+        "topic": "Бюджетирование",
+        "author_style": "lifestyle"
+    }
+]
