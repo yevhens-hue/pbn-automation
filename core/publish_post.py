@@ -87,7 +87,7 @@ def update_existing_post(site_url, username, app_password, target_url, anchor, t
 
 def generate_article(topic, target_link, anchor_text, author_style='neutral'):
     """
-    Generates an article using Google Gemini 1.5 Flash (via google-genai library).
+    Generates an article using Google Gemini 2.0 Flash (via google-genai library).
     """
     print(f"Generating NEW content (Style: {author_style}) for topic: {topic}")
     
@@ -103,23 +103,24 @@ def generate_article(topic, target_link, anchor_text, author_style='neutral'):
     Requirement 3: Return ONLY HTML code, no markdown symbols like ```html.
     """
 
-    # 2. Call Gemini API (New Client with v1 API override)
+    # 2. Call Gemini API (New Client)
     try:
-        # Explicitly setting api_version='v1' to avoid 'models/... not found for v1beta' error
-        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"), http_options={'api_version': 'v1'})
+        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        # Trying the newest model which often has better availability
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.0-flash",
             contents=prompt
         )
-        # Extract title and cleanup content
+        
         title = f"Взгляд эксперта: {topic}"
         if response.text:
             content = response.text.replace('```html', '').replace('```', '')
+            return title, content
         else:
-            raise ValueError("Empty response from Gemini")
-        return title, content
+            raise ValueError("Empty response from AI")
+            
     except Exception as e:
-        print(f"Gemini API error: {e}. Falling back to template.")
+        print(f"⚠️ Gemini API error: {e}. Falling back to template.")
         return generate_article_template(topic, target_link, anchor_text)
 
 def run_tasks(data, output_file='results.json'):
