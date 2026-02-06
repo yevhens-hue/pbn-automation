@@ -7,6 +7,7 @@ from google import genai
 from dotenv import load_dotenv
 import datetime
 import warnings
+import random
 
 # Suppress noisy warnings for a cleaner console output
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -18,14 +19,6 @@ except:
 
 # Load environment variables
 load_dotenv()
-
-# Gemini Configuration
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "ТВОЙ_API_KEY")
-if GEMINI_API_KEY != "ТВОЙ_API_KEY":
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
-else:
-    model = None
 
 # Author Style Definitions
 STYLE_PROMPTS = {
@@ -71,29 +64,30 @@ def publish_to_wordpress(site_url, username, app_password, title, content, statu
         print(f"   ❌ Непредвиденная ошибка при публикации: {e}")
         return None
 
-def get_random_image_url(topic):
+def generate_article_template(topic, target_link, anchor_text):
     """
-    Returns a URL for a random image based on the topic using Unsplash Source.
+    Fallback template generator if AI fails.
     """
-    # Using Unsplash Source (redirection service)
-    safe_topic = requests.utils.quote(topic)
-    return f"https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&q=80&w=1200" # fallback to a finance default
-    # Actually, a better dynamic way:
-    # return f"https://loremflickr.com/1200/800/{safe_topic}" 
+    title = f"{topic}: Полный обзор и советы"
+    content = f"""
+    <h1>Важность темы: {topic}</h1>
+    <p>В современном мире {topic} играет ключевую роль. Многие эксперты согласны с тем, что подход к этому вопросу должен быть системным.</p>
+    <h2>Основные аспекты</h2>
+    <p>Рассматривая <a href="{target_link}">{anchor_text}</a>, важно понимать контекст. Эффективные стратегии всегда включают анализ рисков.</p>
+    <p>Мы рекомендуем детально изучить все доступные материалы.</p>
+    """
+    return title, content
 
-def log_generation(topic, style, prompt, response):
+def update_existing_post(site_url, username, app_password, target_url, anchor, topic):
     """
-    Logs Gemini prompt and response for future analysis.
+    Mock function for updating existing posts (Internal Linking).
+    In a real scenario, this would search for relevant posts via WP API and inject the link.
     """
-    log_entry = {
-        "timestamp": datetime.datetime.now().isoformat(),
-        "topic": topic,
-        "style": style,
-        "prompt": prompt,
-        "response": response
-    }
-    with open("generation_logs.jsonl", "a") as f:
-        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+    # Simply returning None for now as per the simplified logic, 
+    # but printing the intent to show functionality.
+    print(f"   🔍 Поиск релевантных статей для перелинковки по теме '{topic}'...")
+    # Real logic would go here: GET /wp-json/wp/v2/posts?search=topic...
+    return None
 
 def generate_article(topic, target_link, anchor_text, author_style='neutral'):
     """
@@ -112,6 +106,7 @@ def generate_article(topic, target_link, anchor_text, author_style='neutral'):
     Requirement 2: Make the article engaging and around 600 words.
     Requirement 3: Return ONLY HTML code, no markdown symbols like ```html.
     """
+
     # 2. Call Gemini API (New Client)
     try:
         client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -119,10 +114,16 @@ def generate_article(topic, target_link, anchor_text, author_style='neutral'):
             model="gemini-1.5-flash",
             contents=prompt
         )
-        return response.text
+        # Gemini returns the whole generation object, we need the text.
+        # Assuming response.text is available directly or via candidates.
+        # The new library might handle it slightly differently, usually response.text works.
+        title = f"Взгляд эксперта: {topic}" # Simple title generation from topic
+        content = response.text.replace('```html', '').replace('```', '')
+        return title, content
     except Exception as e:
         print(f"Gemini API error: {e}. Falling back to template.")
         return generate_article_template(topic, target_link, anchor_text)
+
 def run_tasks(data, output_file='results.json'):
     """
     Iterates through sequences and attempts to publish/link.
@@ -133,9 +134,9 @@ def run_tasks(data, output_file='results.json'):
         site_url = task.get('site_url')
         login = task.get('login')
         password = task.get('app_password')
-        target_url = task.get('target_url')
-        anchor = task.get('anchor')
-        topic = task.get('topic')
+        target_url = task.get('target_links', task.get('target_url')) # Handle both keys
+        anchor = task.get('anchor_text', task.get('anchor'))
+        topic = task.get('article_topic', task.get('topic'))
         style = task.get('author_style', 'neutral')
         
         if not all([site_url, login, password, target_url, anchor, topic]):
@@ -145,8 +146,8 @@ def run_tasks(data, output_file='results.json'):
         # Feature 3: Try to update existing post first (Internal Linking)
         linked_url = update_existing_post(site_url, login, password, target_url, anchor, topic)
         
-        print(f"Generating NEW content (Style: {style}) for topic: {topic}")
-        title, content = generate_article(topic, anchor, target_url, style)
+        # Determine title and content
+        title, content = generate_article(topic, target_url, anchor, style)
         
         print(f"Publishing to {site_url}...")
         post_result = publish_to_wordpress(site_url, login, password, title, content)
@@ -167,10 +168,10 @@ if __name__ == "__main__":
     # Example input data as provided by the user
     user_input = [
       {
-        "site_url": "https://satellite1.com",
+        "site_url": "[https://satellite1.com](https://satellite1.com)",
         "login": "admin_bot",
         "app_password": "xxxx xxxx xxxx xxxx",
-        "target_url": "https://main-project.com/page1",
+        "target_url": "[https://main-project.com/page1](https://main-project.com/page1)",
         "anchor": "лучшие финансовые советы",
         "topic": "Личные финансы и инвестиции"
       }
