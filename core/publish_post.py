@@ -95,94 +95,34 @@ def log_generation(topic, style, prompt, response):
     with open("generation_logs.jsonl", "a") as f:
         f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
-def generate_article(topic, anchor, target_url, style="neutral"):
+def generate_article(topic, target_link, anchor_text, author_style='neutral'):
     """
-    Generates article content using Gemini API with dynamic persona and logging.
+    Generates an article using Google Gemini 1.5 Flash (via google-genai library).
     """
-    persona = STYLE_PROMPTS.get(style, STYLE_PROMPTS["neutral"])
-    image_url = f"https://loremflickr.com/1200/800/{requests.utils.quote(topic)}"
+    print(f"Generating NEW content (Style: {author_style}) for topic: {topic}")
     
-    if model:
-        print(f"Using Gemini API ({style} style) to generate content for: {topic}")
-        prompt = f"""
-        Ты — автор контента со следующим стилем: {persona}
-        
-        Напиши уникальную полезную статью на тему: {topic}.
-        Требования:
-        1. Объем около 2500 знаков.
-        2. Используй заголовок H1 и несколько подзаголовков H2.
-        3. Органично и нативно вставь в текст ссылку <a href="{target_url}">{anchor}</a>. 
-           Ссылка должна быть частью предложения и не выглядеть как реклама.
-        4. Формат вывода: HTML (только содержимое тега body, без <html> или <body>).
-        
-        В начале статьи ПЕРЕД текстом вставь изображение: <img src="{image_url}" alt="{topic}" style="width:100%; height:auto; margin-bottom:20px;">
-        """
-        try:
-            response = model.generate_content(prompt)
-            full_text = response.text
-            
-            # Log the generation
-            log_generation(topic, style, prompt, full_text)
-            
-            if "<h1>" in full_text:
-                title_start = full_text.find("<h1>") + 4
-                title_end = full_text.find("</h1>")
-                title = full_text[title_start:title_end].strip()
-                content = full_text[title_end+5:].strip()
-            else:
-                title = f"{topic}: Полное руководство"
-                content = full_text
-                
-            return title, content
-        except Exception as e:
-            print(f"Gemini API error: {e}. Falling back to template.")
-
-    # Fallback remains similar
-    title = f"{topic}: {style.capitalize()} взгляд на проблему"
-    content = f'<img src="{image_url}" alt="{topic}"><p>Статья в стиле {style} на тему {topic}...</p>'
-    return title, content
-
-def update_existing_post(site_url, username, password, target_url, anchor, topic):
-    """
-    Fetches the latest posts and attempts to inject a link.
-    Safety Valve: Only injects if the post has less than 4 external links.
-    """
-    auth_string = f"{username}:{password}"
-    auth_header = base64.b64encode(auth_string.encode()).decode()
-    headers = {'Authorization': f'Basic {auth_header}', 'User-Agent': 'WP-Updater-Bot/1.0'}
+    # 1. Get Prompts
+    style_instruction = STYLE_PROMPTS.get(author_style, STYLE_PROMPTS['neutral'])
+    prompt = f"""
+    You are a professional blog writer. {style_instruction}
     
-    endpoint = f"{site_url.rstrip('/')}/wp-json/wp/v2/posts?per_page=5"
+    Task: Write a SEO-optimized article provided in HTML format (use <h1>, <h2>, <p> tags only).
+    Topic: {topic}
+    Requirement 1: Include a natural link to "{target_link}" with anchor text "{anchor_text}".
+    Requirement 2: Make the article engaging and around 600 words.
+    Requirement 3: Return ONLY HTML code, no markdown symbols like ```html.
+    """
+    # 2. Call Gemini API (New Client)
     try:
-        response = requests.get(endpoint, headers=headers, timeout=15)
-        if response.status_code == 200:
-            posts = response.json()
-            if not posts:
-                print(f"   ℹ️  На сайте пока нет старых постов для перелинковки.")
-                return False
-                
-            for post in posts:
-                content = post['content']['rendered']
-                link_count = content.count("<a ")
-                
-                if link_count >= 4:
-                    continue
-
-                if topic.lower() in content.lower() and target_url not in content:
-                    print(f"   🔗 Нашел старый пост для ссылки: {post['link']}")
-                    new_content = content.replace(topic, f' <a href="{target_url}">{anchor}</a> ', 1)
-                    update_res = requests.post(f"{site_url.rstrip('/')}/wp-json/wp/v2/posts/{post['id']}", 
-                                             headers=headers, json={'content': new_content})
-                    if update_res.status_code == 200:
-                        print("   ✅ Ссылка успешно добавлена в старый пост.")
-                        return post['link']
-        return False
-    except json.JSONDecodeError:
-        print("   ⚠️  Сайт ответил не в формате WordPress (возможно, домен припаркован).")
-    except Exception:
-        # Silently fail for internal linking to not distract from main task
-        pass
-    return False
-
+        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt
+        )
+        return response.text
+    except Exception as e:
+        print(f"Gemini API error: {e}. Falling back to template.")
+        return generate_article_template(topic, target_link, anchor_text)
 def run_tasks(data, output_file='results.json'):
     """
     Iterates through sequences and attempts to publish/link.
