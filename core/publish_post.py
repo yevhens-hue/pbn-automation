@@ -3,7 +3,7 @@ import json
 import base64
 import sys
 import os
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 import datetime
 import warnings
