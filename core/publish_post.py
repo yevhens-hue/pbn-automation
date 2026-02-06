@@ -7,7 +7,6 @@ from google import genai
 from dotenv import load_dotenv
 import datetime
 import warnings
-import random
 
 # Suppress noisy warnings for a cleaner console output
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -83,10 +82,7 @@ def update_existing_post(site_url, username, app_password, target_url, anchor, t
     Mock function for updating existing posts (Internal Linking).
     In a real scenario, this would search for relevant posts via WP API and inject the link.
     """
-    # Simply returning None for now as per the simplified logic, 
-    # but printing the intent to show functionality.
     print(f"   🔍 Поиск релевантных статей для перелинковки по теме '{topic}'...")
-    # Real logic would go here: GET /wp-json/wp/v2/posts?search=topic...
     return None
 
 def generate_article(topic, target_link, anchor_text, author_style='neutral'):
@@ -107,18 +103,20 @@ def generate_article(topic, target_link, anchor_text, author_style='neutral'):
     Requirement 3: Return ONLY HTML code, no markdown symbols like ```html.
     """
 
-    # 2. Call Gemini API (New Client)
+    # 2. Call Gemini API (New Client with v1 API override)
     try:
-        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        # Explicitly setting api_version='v1' to avoid 'models/... not found for v1beta' error
+        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"), http_options={'api_version': 'v1'})
         response = client.models.generate_content(
             model="gemini-1.5-flash",
             contents=prompt
         )
-        # Gemini returns the whole generation object, we need the text.
-        # Assuming response.text is available directly or via candidates.
-        # The new library might handle it slightly differently, usually response.text works.
-        title = f"Взгляд эксперта: {topic}" # Simple title generation from topic
-        content = response.text.replace('```html', '').replace('```', '')
+        # Extract title and cleanup content
+        title = f"Взгляд эксперта: {topic}"
+        if response.text:
+            content = response.text.replace('```html', '').replace('```', '')
+        else:
+            raise ValueError("Empty response from Gemini")
         return title, content
     except Exception as e:
         print(f"Gemini API error: {e}. Falling back to template.")
@@ -134,7 +132,7 @@ def run_tasks(data, output_file='results.json'):
         site_url = task.get('site_url')
         login = task.get('login')
         password = task.get('app_password')
-        target_url = task.get('target_links', task.get('target_url')) # Handle both keys
+        target_url = task.get('target_links', task.get('target_url')) 
         anchor = task.get('anchor_text', task.get('anchor'))
         topic = task.get('article_topic', task.get('topic'))
         style = task.get('author_style', 'neutral')
@@ -143,10 +141,8 @@ def run_tasks(data, output_file='results.json'):
             print(f"Skip task {i+1}: Missing fields.")
             continue
             
-        # Feature 3: Try to update existing post first (Internal Linking)
         linked_url = update_existing_post(site_url, login, password, target_url, anchor, topic)
         
-        # Determine title and content
         title, content = generate_article(topic, target_url, anchor, style)
         
         print(f"Publishing to {site_url}...")
@@ -165,19 +161,7 @@ def run_tasks(data, output_file='results.json'):
     return results
 
 if __name__ == "__main__":
-    # Example input data as provided by the user
-    user_input = [
-      {
-        "site_url": "[https://satellite1.com](https://satellite1.com)",
-        "login": "admin_bot",
-        "app_password": "xxxx xxxx xxxx xxxx",
-        "target_url": "[https://main-project.com/page1](https://main-project.com/page1)",
-        "anchor": "лучшие финансовые советы",
-        "topic": "Личные финансы и инвестиции"
-      }
-    ]
-    
-    # Check if a JSON file was passed as an argument
+    user_input = []
     if len(sys.argv) > 1:
         try:
             with open(sys.argv[1], 'r') as f:
@@ -186,4 +170,7 @@ if __name__ == "__main__":
             print(f"Error reading input file: {e}")
             sys.exit(1)
             
-    run_tasks(user_input)
+    if not user_input:
+        print("No tasks to run.")
+    else:
+        run_tasks(user_input)
