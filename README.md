@@ -1,25 +1,14 @@
-# 🚀 PBN Automation Empire (Antigravity Edition)
+# Progressive Web App (PWA) Native Shell
 
-Автономная система управления сеткой из 1000+ сателлитов на базе ИИ и профессиональной аналитики.
+A high-performance frontend architecture packaged as a Progressive Web App (PWA), providing a native-app-like experience in the browser.
 
-## ✨ Ключевые возможности
-- **AI Content Engine:** Генерация уникальных статей через Gemini 1.5 Flash.
-- **Persona Shift:** Автоматическая смена стилей письма (Expert/Lifestyle) для обхода фильтров.
-- **Smart Interlinking:** Модуль автоматического внедрения ссылок в старый контент.
-- **Safety First:** Встроенный контроль плотности ссылок (не более 4 на статью).
-- **BI Monitoring:** Real-time дашборд в Grafana с финансовым учетом.
+## Architecture Highlights
+- **Offline Capabilities**: Implements complex Service Workers to cache payloads and allow offline interaction with the application.
+- **Installable Native Feel**: Fully configured Web App Manifest allows users to install the dashboard directly to their mobile or desktop home screens.
+- **Tech Stack**: TypeScript, Service Workers, Progressive Web App (PWA) standards.
 
-## 📊 Стек технологий
-- **Core:** Python 3, WordPress REST API, SQLite.
-- **AI:** Google Gemini 1.5 Flash (через API).
-- **Orchestration:** Antigravity Project Environment.
-- **Analytics:** Grafana & SQL.
-
-## 🛠 Быстрый старт
-1. Настройте `.env` с вашими API ключами.
-2. Заполните базу сайтов в `sites_data.json`.
-3. Запустите публикацию: `python3 publish_post.py sites_data.json`.
-4. Просмотрите аналитику: `python3 dashboard.py`.
-
----
-*Проект разработан в рамках автоматизации SEO-процессов для Antigravity.*
+## Setup
+```bash
+npm install
+npm run build
+```
