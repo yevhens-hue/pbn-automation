@@ -12,3 +12,6 @@ A high-performance frontend architecture packaged as a Progressive Web App (PWA)
 npm install
 npm run build
 ```
+
+
+<!-- activity-sync: 2026-08-28 -->
